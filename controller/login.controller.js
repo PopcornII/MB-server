@@ -45,41 +45,42 @@ const login = async (req, res, next) =>{
 const logout = async (req, res) =>{
     // Clear the token from the client
     try{
+        res.json({ message: 'Logout successful' });
 
     }catch(err){
         console.error('Error during logout:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-    res.json({ message: 'Logout successful' });
 }
 const signUp = async(req, res) => {
    
-    const { username, email, password, confirmPassword } = req.body;
-    // Check if password and confirmPassword match
-    if (password !== confirmPassword) {
-        return res.status(400).json({ error: 'Passwords do not match' });
-    }
     
     try {
-    
+        const { username, email, password, confirmPassword } = req.body;
+        // Check if password and confirmPassword match
+        if (password !== confirmPassword) {
+            return res.status(400).json({ error: 'Passwords do not match' });
+        }
+       
+        // Check if the username already exists
+        const [ExistUsername] = await db.promise().query(`SELECT username FROM users WHERE username = ?`,[username]);
+        if(ExistUsername.length > 0){
+            console.log("Duplicated Username");
+            res.json({ message: "Username already exist"})
+        }
         const hashedPassword = await bcrypt.hash(password, 10);
-        const dbUsername = await db.promise().query(`SELECT username FROM users WHERE username = ?`)
+        // Insert user into the database
         const [userResults] = await db.promise().query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const userId = userResults.insertId;
+         // Insert profile for the user
         await db.promise().query(`
         INSERT INTO profiles (user_id, full_name, bio, avatar_url) 
         VALUES (?, ?, ?, ?)`, [userId, , , ,]);
         const user = { user_id: userId, username, role: 'client' };
         const token = signToken(user);
-        if(userResults.username === dbUsername > 0){
-            console.log("Duplicated Username");
-            res.json({ message: "username already exist"})
 
-        }else{
-            res.json({ message: 'Signup successful', token, user });
+        res.json({ message: 'Signup successful', token, user });
 
-        }
-          
       } catch (err) {
         console.error('Error during signup:', err);
         res.status(500).json({ error: 'Internal Server Error' });
